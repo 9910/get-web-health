@@ -101,3 +101,35 @@ dist/                        generated deployable frontend
 ```
 
 Docs: https://supabase.com/docs/guides/auth/passwords · https://supabase.com/docs/guides/functions/schedule-functions · https://supabase.com/docs/guides/database/postgres/row-level-security
+
+## Backend observability and status pages
+
+The workspace now includes Observability (captured request traffic, server errors, latency percentiles, route performance, searchable logs), an in-app failed-check alert inbox, and opt-in public status pages. Paid plans remain pricing previews with no checkout.
+
+To connect an Express backend:
+1. Log in and open Observability → Connect backend.
+2. Save the one-time integration key as GWH_TELEMETRY_KEY in your backend host environment. Never put it in frontend code or GitHub.
+3. Download `/express.mjs` from the deployed site, or copy `sdk/express.mjs` into your backend.
+4. Register middleware before routes and error middleware after routes:
+
+```js
+import { createWebHealth } from './express.mjs';
+const health = createWebHealth();
+app.use(health.middleware);
+// Existing routes
+app.use(health.errorMiddleware);
+// Existing final error handler
+```
+
+Restart your backend and make requests. The SDK sends route templates, method, HTTP status, duration, and sanitized error type. It excludes bodies, query strings, headers, cookies, IPs, error messages and stacks. Delivery is best effort, bounded to 200 queued events; failed batches are dropped. Metrics describe captured events, not complete traffic. Call `await health.close()` during graceful shutdown to drain queued batches.
+
+Each account supports five integrations and three status pages. Each integration accepts at most 1,000 events/hour; the UI loads the latest 1,000 events and displays up to 100 matching logs. Events are retained for seven days. Status pages begin private; select endpoints and explicitly publish. Public pages expose only component names, current state and check timestamps. Stale checks show unknown instead of operational.
+
+For a fresh Supabase installation, apply `supabase/setup.sql`, then `supabase/observability.sql`. Deploy health-worker, telemetry-ingest and public-status using `supabase/config.toml`. Ingest authenticates server keys against stored SHA-256 hashes; the public-status function intentionally permits anonymous reads of explicitly published components. Configure cleanup:
+
+```sql
+select cron.schedule('get-web-health-telemetry-cleanup','27 3 * * *',
+  $$delete from public.request_events where received_at < now() - interval '7 days'$$);
+```
+
+Email/external alerts need an email or webhook provider and are not implemented. This app does not provide infrastructure CPU/memory metrics, distributed tracing, or multi-region probes. Supabase signup confirmation emails need custom SMTP for unrestricted public signup. Tests cover database ownership and privileges, quota enforcement, transactional component selection, SDK privacy and delivery behavior.

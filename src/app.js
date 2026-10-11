@@ -2,6 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { normalizeEndpoint, monitorState } from './shared.js';
 import { monitoringView, summarizeChecks } from './monitoring.js';
 import { reliabilityView, incidentsView, plansView, checksCsv } from './operations.js';
+import { telemetryView, alertsView, statusPagesView } from './observability.js';
+import { newIntegrationKey } from './integrations.js';
+let telemetryApps=[], requestEvents=[], acknowledgements=[], statusPages=[], statusComponents=[], observabilityError='';
+const telemetryOptions={appId:'',hours:24,search:'',errorsOnly:false};
+const publicSlug=new URLSearchParams(location.search).get('status');
 let healthDays = 1, healthMonitorId = '', healthTarget = 99.9, incidentState = 'all';
 
 const supabase = createClient(__SUPABASE_URL__, __SUPABASE_KEY__);
@@ -54,7 +59,7 @@ function renderAuth() {
 
 function navigation() {
   const email = session.user.email ?? 'Your account';
-  return `<aside class="sidebar">${brand()}<div class="workspace-label">YOUR WORKSPACE <span>PERSONAL</span></div><nav aria-label="Main navigation"><button data-page="monitors" class="nav-item ${page === 'monitors' ? 'active' : ''}">${icon('grid')}Overview<span class="nav-count">${monitors.length}</span></button><button data-page="health" class="nav-item ${page === 'health' ? 'active' : ''}">${icon('pulse')}Health monitoring</button><button data-page="incidents" class="nav-item ${page === 'incidents' ? 'active' : ''}">${icon('bolt')}Incidents</button><button data-page="plans" class="nav-item ${page === 'plans' ? 'active' : ''}">${icon('shield')}Plans & usage</button><button data-page="activity" class="nav-item ${page === 'activity' ? 'active' : ''}">${icon('clock')}Check history</button><button data-page="settings" class="nav-item ${page === 'settings' ? 'active' : ''}">${icon('settings')}Account</button></nav><div class="sidebar-tip"><span class="tip-icon">${icon('bolt')}</span><h3>A gentle nudge.</h3><p>Checks run in the cloud, even when this tab is closed.</p><span>SMALL CHECKS, LESS GUESSWORK</span></div><div class="account-mini"><span class="avatar">${e(email[0].toUpperCase())}</span><span><b>Your workspace</b><small title="${e(email)}">${e(email)}</small></span><button class="icon-button" data-action="logout" aria-label="Log out">${icon('logout')}</button></div></aside>`;
+  return `<aside class="sidebar">${brand()}<div class="workspace-label">YOUR WORKSPACE <span>PERSONAL</span></div><nav aria-label="Main navigation"><button data-page="monitors" class="nav-item ${page === 'monitors' ? 'active' : ''}">${icon('grid')}Overview<span class="nav-count">${monitors.length}</span></button><button data-page="health" class="nav-item ${page === 'health' ? 'active' : ''}">${icon('pulse')}Health monitoring</button><button data-page="incidents" class="nav-item ${page === 'incidents' ? 'active' : ''}">${icon('bolt')}Incidents</button>${[["telemetry","Observability","pulse"],["alerts","Alerts","bolt"],["status","Status pages","link"]].map(([id,label,glyph])=>`<button data-page="${id}" class="nav-item ${page===id?'active':''}">${icon(glyph)}${label}</button>`).join('')}<button data-page="plans" class="nav-item ${page === 'plans' ? 'active' : ''}">${icon('shield')}Plans & usage</button><button data-page="activity" class="nav-item ${page === 'activity' ? 'active' : ''}">${icon('clock')}Check history</button><button data-page="settings" class="nav-item ${page === 'settings' ? 'active' : ''}">${icon('settings')}Account</button></nav><div class="sidebar-tip"><span class="tip-icon">${icon('bolt')}</span><h3>A gentle nudge.</h3><p>Checks run in the cloud, even when this tab is closed.</p><span>SMALL CHECKS, LESS GUESSWORK</span></div><div class="account-mini"><span class="avatar">${e(email[0].toUpperCase())}</span><span><b>Your workspace</b><small title="${e(email)}">${e(email)}</small></span><button class="icon-button" data-action="logout" aria-label="Log out">${icon('logout')}</button></div></aside>`;
 }
 
 function stats() {
@@ -87,10 +92,10 @@ function accountPanel() {
 }
 
 function renderDashboard() {
-  const titles = { monitors: ['A little peace of uptime.', 'Your backends, all looked after in one place.'], activity: ['Every check tells a story.', 'The real responses behind your endpoint health.'], incidents: ['Understand every interruption.', 'Follow failures, observed recoveries, and gaps in check history.'], plans: ['Monitoring that grows with you.', 'Your current usage and a preview of upcoming paid plans.'], settings: ['A workspace of your own.', 'Your account and how your checks work.'] };
+  const titles = { telemetry:['Backend observability.','Explore captured requests, server errors, and route performance.'], alerts:['Your alert inbox.','Review failed checks and keep track of interruptions.'], status:['Share service health.','Publish status pages for selected endpoints.'], monitors: ['A little peace of uptime.', 'Your backends, all looked after in one place.'], activity: ['Every check tells a story.', 'The real responses behind your endpoint health.'], incidents: ['Understand every interruption.', 'Follow failures, observed recoveries, and gaps in check history.'], plans: ['Monitoring that grows with you.', 'Your current usage and a preview of upcoming paid plans.'], settings: ['A workspace of your own.', 'Your account and how your checks work.'] };
   const [title, subtitle] = page === 'health' ? ['A clearer picture of health.', 'Explore uptime, response times, and failed checks.'] : titles[page];
-  app.innerHTML = `<div class="dashboard">${navigation()}<main class="main"><header class="topbar"><span class="breadcrumb">Workspace <span>/</span> ${page === 'monitors' ? 'Overview' : page === 'health' ? 'Health monitoring' : page === 'incidents' ? 'Incidents' : page === 'plans' ? 'Plans & usage' : page === 'activity' ? 'Check history' : 'Account'}</span><div><span class="private-label">${icon('shield')} Private workspace</span><span class="avatar small">${e((session.user.email ?? 'U')[0].toUpperCase())}</span></div></header><div class="main-content"><div class="page-heading"><div><div class="section-kicker">${page === 'monitors' ? 'YOUR BACKEND COMPANION' : 'YOUR WORKSPACE'}</div><h1>${page === 'health' ? 'A clearer picture of health.' : title}</h1><p>${page === 'health' ? 'Explore uptime, response times, and failed checks.' : subtitle}</p></div>${['settings', 'plans'].includes(page) ? '' : `<button class="primary" data-action="add">${icon('plus')} Add endpoint</button>`}</div>${loadError ? `<div class="error-banner" role="alert">${icon('pulse')}<span>${e(loadError)}</span><button class="text-button" data-action="refresh">Try again</button></div>` : ''}${page === 'monitors' ? `${stats()}<section class="endpoints-section"><div class="section-heading"><h2>Your endpoints <span>${monitors.length}</span></h2><button class="text-button refresh-button" data-action="refresh" ${loading ? 'disabled' : ''}>${icon('refresh', loading ? 'spin' : '')}${loading ? 'Refreshing' : 'Refresh'}</button></div><div class="list-toolbar"><div class="filters" role="group" aria-label="Filter endpoints">${['all', 'active', 'paused'].map(f => `<button data-filter="${f}" class="${filter === f ? 'selected' : ''}">${f === 'all' ? 'All endpoints' : f === 'active' ? 'Active' : 'Paused'}</button>`).join('')}</div><div class="search-wrap">${icon('search')}<input type="search" id="endpoint-search" aria-label="Search endpoints" placeholder="Search endpoints…" value="${e(search)}" /></div></div><div id="monitor-list">${monitorList()}</div></section><div class="calm-note">${icon('shield')} Saved securely. Checked in the cloud. Yours to control.<span>Refreshes every 30 seconds</span></div>` : page === 'health' ? reliabilityView(monitors, checks, { days: healthDays, monitorId: healthMonitorId, target: healthTarget }, e) + monitoringView(monitors, checks, { days: healthDays, monitorId: healthMonitorId }, e) : page === 'incidents' ? incidentsView(monitors, checks, { days: healthDays, monitorId: healthMonitorId, state: incidentState }, e) : page === 'plans' ? plansView(monitors, e) : page === 'activity' ? historyTable() : accountPanel()}<footer class="dashboard-footer"><span>KEEP BUILDING. WE’LL KEEP CHECKING.</span><span>get web health<span class="brand-dot">.</span></span></footer></div></main></div>`;
-  if (!['settings', 'plans'].includes(page) && !loading && !loadError) {
+  app.innerHTML = `<div class="dashboard">${navigation()}<main class="main"><header class="topbar"><span class="breadcrumb">Workspace <span>/</span> ${page === 'telemetry' ? 'Observability' : page === 'alerts' ? 'Alerts' : page === 'status' ? 'Status pages' : page === 'monitors' ? 'Overview' : page === 'health' ? 'Health monitoring' : page === 'incidents' ? 'Incidents' : page === 'plans' ? 'Plans & usage' : page === 'activity' ? 'Check history' : 'Account'}</span><div><span class="private-label">${icon('shield')} Private workspace</span><span class="avatar small">${e((session.user.email ?? 'U')[0].toUpperCase())}</span></div></header><div class="main-content"><div class="page-heading"><div><div class="section-kicker">${page === 'monitors' ? 'YOUR BACKEND COMPANION' : 'YOUR WORKSPACE'}</div><h1>${page === 'health' ? 'A clearer picture of health.' : title}</h1><p>${page === 'health' ? 'Explore uptime, response times, and failed checks.' : subtitle}</p></div>${['settings','plans','telemetry','status'].includes(page) ? '' : `<button class="primary" data-action="add">${icon('plus')} Add endpoint</button>`}</div>${loadError ? `<div class="error-banner" role="alert">${icon('pulse')}<span>${e(loadError)}</span><button class="text-button" data-action="refresh">Try again</button></div>` : ''}${observabilityError && ['telemetry','alerts','status'].includes(page)?`<div class="error-banner" role="alert">${e(observabilityError)}</div>`:''}${page === 'monitors' ? `${stats()}<section class="endpoints-section"><div class="section-heading"><h2>Your endpoints <span>${monitors.length}</span></h2><button class="text-button refresh-button" data-action="refresh" ${loading ? 'disabled' : ''}>${icon('refresh', loading ? 'spin' : '')}${loading ? 'Refreshing' : 'Refresh'}</button></div><div class="list-toolbar"><div class="filters" role="group" aria-label="Filter endpoints">${['all', 'active', 'paused'].map(f => `<button data-filter="${f}" class="${filter === f ? 'selected' : ''}">${f === 'all' ? 'All endpoints' : f === 'active' ? 'Active' : 'Paused'}</button>`).join('')}</div><div class="search-wrap">${icon('search')}<input type="search" id="endpoint-search" aria-label="Search endpoints" placeholder="Search endpoints…" value="${e(search)}" /></div></div><div id="monitor-list">${monitorList()}</div></section><div class="calm-note">${icon('shield')} Saved securely. Checked in the cloud. Yours to control.<span>Refreshes every 30 seconds</span></div>` : page === 'health' ? reliabilityView(monitors, checks, { days: healthDays, monitorId: healthMonitorId, target: healthTarget }, e) + monitoringView(monitors, checks, { days: healthDays, monitorId: healthMonitorId }, e) : page === 'incidents' ? incidentsView(monitors, checks, { days: healthDays, monitorId: healthMonitorId, state: incidentState }, e) : page === 'telemetry' ? telemetryView(telemetryApps,requestEvents,telemetryOptions,e) : page === 'alerts' ? alertsView(monitors,checks,acknowledgements,e) : page === 'status' ? statusPagesView(statusPages,e) : page === 'plans' ? plansView(monitors, e) : page === 'activity' ? historyTable() : accountPanel()}<footer class="dashboard-footer"><span>KEEP BUILDING. WE’LL KEEP CHECKING.</span><span>get web health<span class="brand-dot">.</span></span></footer></div></main></div>`;
+  if (!['settings','plans','telemetry','status'].includes(page) && !loading && !loadError) {
     const schedulerHealthy = scheduler?.last_run_at && Date.now() - new Date(scheduler.last_run_at).getTime() < 180000;
     const notice = document.createElement('div');
     notice.className = schedulerHealthy ? 'scheduler-indicator' : 'error-banner';
@@ -107,16 +112,23 @@ async function loadWorkspace({ quiet = false } = {}) {
   loading = true;
   if (!quiet && !document.querySelector('dialog[open]')) renderDashboard();
   try {
-    const [m, c, s] = await Promise.all([
+    const [m,c,s,ta,re,aa,sp,sc] = await Promise.all([
       supabase.from('monitors').select('*').order('created_at', { ascending: false }),
       supabase.from('health_checks').select('*').order('checked_at', { ascending: false }).limit(200),
       supabase.from('scheduler_status').select('last_run_at').eq('id', true).maybeSingle(),
+      supabase.from('telemetry_apps').select('id,name,last_received_at,created_at').order('created_at',{ascending:false}),
+      supabase.from('request_events').select('*').order('received_at',{ascending:false}).limit(1000),
+      supabase.from('alert_acknowledgements').select('check_id'),
+      supabase.from('status_pages').select('*'),
+      supabase.from('status_components').select('*'),
     ]);
     if (!session || session.user.id !== userId) return;
     if (m.error) throw m.error;
     if (c.error) throw c.error;
     if (s.error) throw s.error;
-    monitors = m.data; checks = c.data; scheduler = s.data; loadError = '';
+    monitors=m.data;checks=c.data;scheduler=s.data;loadError='';
+    const extraError=[ta,re,aa,sp,sc].find(r=>r.error)?.error;observabilityError=extraError?errorText(extraError):'';
+    telemetryApps=ta.data??[];requestEvents=re.data??[];acknowledgements=aa.data??[];statusPages=sp.data??[];statusComponents=sc.data??[];
   } catch (error) { if (session?.user.id === userId) loadError = errorText(error); }
   finally {
     loading = false;
@@ -125,6 +137,60 @@ async function loadWorkspace({ quiet = false } = {}) {
 }
 
 function startPolling() { clearInterval(pollTimer); pollTimer = setInterval(() => { if (document.visibilityState === 'visible') void loadWorkspace({ quiet: true }); }, 30000); }
+
+function integrationDialog(title,content,onSave) {
+ const dialog=document.createElement('dialog');dialog.className='monitor-dialog';
+ dialog.innerHTML=`<div class="dialog-top"><span class="endpoint-icon">${icon('pulse')}</span><button type="button" class="icon-button" data-close-dialog aria-label="Close">${icon('close')}</button></div><h2>${e(title)}</h2><form>${content}<p class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" class="secondary" data-close-dialog>Close</button>${onSave?'<button type="submit" class="primary">Save</button>':''}</div></form>`;
+ app.append(dialog);dialog.showModal();dialog.addEventListener('close',()=>{dialog.innerHTML='';dialog.remove();});
+ dialog.addEventListener('click',ev=>{if(ev.target.closest('[data-close-dialog]'))dialog.close();});
+ dialog.querySelector('form').addEventListener('submit',async ev=>{ev.preventDefault();if(!onSave)return;ev.submitter.disabled=true;try{await onSave(new FormData(ev.target));dialog.close();await loadWorkspace();}catch(err){dialog.querySelector('.form-error').textContent=errorText(err);}finally{ev.submitter.disabled=false;}});
+ return dialog;
+}
+
+function showIntegrationKey(key) {
+ integrationDialog('Install your backend integration.',`<p>This key is shown once. Save it as <b>GWH_TELEMETRY_KEY</b> in your backend environment. Keep it on the server.</p><label for="integration-key">Server integration key</label><input id="integration-key" class="key-field" readonly value="${e(key)}"><p>Download the <a href="/express.mjs" download>Express SDK</a> and install it before your routes. Register its error middleware after your routes.</p><pre class="integration-code">import { createWebHealth } from './express.mjs';
+const health = createWebHealth();
+app.use(health.middleware);
+// Your routes go here
+app.use(health.errorMiddleware);</pre><p class="field-help">Restart your backend after setting the environment variable. New request events appear in Observability.</p>`);
+}
+
+async function monitoringAction(action,button) {
+ if(action==='create-telemetry'||action==='rotate-telemetry') {
+  const existing=telemetryApps.find(a=>a.id===button.dataset.appId);
+  if(action==='rotate-telemetry'&&!existing)return;
+  integrationDialog(existing?'Replace integration key?':'Connect a backend.',existing?'<p>Saving replaces the current key immediately. Update the backend environment with the new key and restart it to resume telemetry.</p>':'<label for="integration-name">Application name</label><input id="integration-name" name="name" required maxlength="80" placeholder="My API">',async data=>{
+   const {key,key_hash}=await newIntegrationKey();
+   const result=existing?await supabase.from('telemetry_apps').update({key_hash}).eq('id',existing.id).select('id').single():await supabase.from('telemetry_apps').insert({user_id:session.user.id,name:String(data.get('name')).trim(),key_hash}).select('id,name').single();
+   if(result.error)throw result.error;
+   setTimeout(()=>showIntegrationKey(key),0);
+  });return;
+ }
+ if(action==='create-status'||action==='edit-status') {
+  const current=statusPages.find(p=>p.id===button.dataset.statusId);if(action==='edit-status'&&!current)return;
+  const selected=new Set(statusComponents.filter(c=>c.page_id===current?.id).map(c=>c.monitor_id));
+  integrationDialog(current?'Choose public components.':'Create a private status page.',`${current?'':'<label for="status-title">Page title</label><input id="status-title" name="title" required maxlength="80" placeholder="Service status">'}<p>Select endpoints to include. Only names and health are shared when published.</p><div class="component-options">${monitors.map(m=>`<label><input type="checkbox" name="monitor" value="${e(m.id)}" ${selected.has(m.id)?'checked':''}>${e(m.name)}</label>`).join('')||'<p>Add an endpoint to include service health.</p>'}</div>`,async data=>{
+   let id=current?.id;if(!id){const result=await supabase.from('status_pages').insert({user_id:session.user.id,title:String(data.get('title')).trim()}).select('id').single();if(result.error)throw result.error;id=result.data.id;}
+   const {error}=await supabase.rpc('set_status_components',{p_page_id:id,p_monitor_ids:data.getAll('monitor')});if(error)throw error;
+  });return;
+ }
+ button.disabled=true;
+ try{
+  let result;
+  if(action==='ack-alert')result=await supabase.from('alert_acknowledgements').insert({user_id:session.user.id,check_id:button.dataset.checkId});
+  if(action==='publish-status'){const p=statusPages.find(p=>p.id===button.dataset.statusId);if(!p)return;if(!p.published&&!statusComponents.some(c=>c.page_id===p.id))throw new Error('Choose at least one endpoint before publishing.');result=await supabase.from('status_pages').update({published:!p.published}).eq('id',p.id);}
+  if(result?.error&&result.error.code!=='23505')throw result.error;await loadWorkspace();
+ }catch(err){toast(errorText(err));}finally{button.disabled=false;}
+}
+
+async function renderPublicStatus() {
+ try{
+  const response=await fetch(`${__SUPABASE_URL__}/functions/v1/public-status?slug=${encodeURIComponent(publicSlug)}`,{signal:AbortSignal.timeout(10000)});
+  if(!response.ok)throw new Error(response.status===404?'This status page is unavailable or private.':'Status data is temporarily unavailable.');
+  const data=await response.json();const labels={operational:'Operational',disrupted:'Disrupted',maintenance:'Paused',pending:'Awaiting first check',unknown:'Check overdue'};
+  app.innerHTML=`<main class="public-status">${brand()}<span class="section-kicker">SERVICE STATUS</span><h1>${e(data.title)}</h1><p>Current health from scheduled endpoint checks.</p>${data.components.map(c=>`<article class="alert-row"><span><strong>${e(c.name)}</strong><small>${c.last_checked_at?`Last checked ${e(new Date(c.last_checked_at).toLocaleString())}`:'No recorded checks'}</small></span><span class="badge ${c.status==='operational'?'up':c.status==='disrupted'?'down':'paused'}">${e(labels[c.status]??'Unknown')}</span></article>`).join('')||'<p>No components are listed.</p>'}<p class="monitoring-note">Refreshes every 30 seconds. Updated ${e(new Date(data.updated_at).toLocaleString())}.</p></main>`;
+ }catch(err){app.innerHTML=`<main class="public-status">${brand()}<h1>Status unavailable</h1><p role="alert">${e(err.message)}</p><p>We will retry in 30 seconds.</p></main>`;}
+}
 
 function showMonitorDialog(monitor = null) {
   const dialog = document.createElement('dialog');
@@ -172,6 +238,7 @@ app.addEventListener('click', async event => {
   if (action === 'add') { showMonitorDialog(); return; }
   if (action === 'refresh') { await loadWorkspace(); return; }
   if (action === 'logout') { button.disabled = true; const { error } = await supabase.auth.signOut(); if (error) { toast(errorText(error)); button.disabled = false; } return; }
+  if(['create-telemetry','rotate-telemetry','create-status','edit-status','publish-status','ack-alert'].includes(action)){await monitoringAction(action,button);return;}
   const monitor = monitors.find(m => m.id === button.dataset.id); if (!monitor) return;
   if (action === 'edit') { showMonitorDialog(monitor); return; }
   if (action === 'delete') { deleteDialog(monitor); return; }
@@ -219,9 +286,10 @@ app.addEventListener('submit', async event => {
 });
 
 supabase.auth.onAuthStateChange((event, nextSession) => {
+  if(publicSlug)return;
   const prior = session?.user.id; session = nextSession;
   if (event === 'PASSWORD_RECOVERY') { recovery = true; authMode = 'reset'; renderAuth(); return; }
-  if (!session) { monitors = []; checks = []; scheduler = null; loadError = ''; page = 'monitors'; recovery = false; renderAuth(); return; }
+  if (!session) { telemetryApps=[];requestEvents=[];acknowledgements=[];statusPages=[];statusComponents=[];observabilityError=''; monitors = []; checks = []; scheduler = null; loadError = ''; page = 'monitors'; recovery = false; renderAuth(); return; }
   if (prior !== session.user.id || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
     if (recovery) { authMode = 'reset'; renderAuth(); return; }
     renderDashboard(); startPolling(); setTimeout(() => void loadWorkspace(), 0);
@@ -230,10 +298,16 @@ supabase.auth.onAuthStateChange((event, nextSession) => {
 
 const callbackError = new URLSearchParams(location.hash.slice(1)).get('error_description');
 if (callbackError) authError = callbackError;
-renderAuth();
+if(publicSlug){void renderPublicStatus();setInterval(()=>void renderPublicStatus(),30000);}else renderAuth();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && session) void loadWorkspace({ quiet: true }); });
 
 app.addEventListener('change', event => {
+ const id=event.target.id;
+ if(id==='telemetry-app')telemetryOptions.appId=event.target.value;
+ if(id==='telemetry-hours')telemetryOptions.hours=[1,24,168].includes(Number(event.target.value))?Number(event.target.value):24;
+ if(id==='telemetry-search')telemetryOptions.search=event.target.value;
+ if(id==='telemetry-errors')telemetryOptions.errorsOnly=event.target.checked;
+ if(id?.startsWith('telemetry-'))renderDashboard();
   if (event.target.id === 'health-target') { healthTarget = [99,99.9,99.99].includes(Number(event.target.value)) ? Number(event.target.value) : 99.9; renderDashboard(); }
   if (event.target.id === 'incident-state') { incidentState = event.target.value; renderDashboard(); }
   if (event.target.id === 'health-range') { healthDays = Number(event.target.value) === 7 ? 7 : 1; renderDashboard(); }

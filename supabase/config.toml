@@ -4,3 +4,11 @@ project_id = "get-web-health"
 # Requests are authenticated inside the function: a verified user JWT or a
 # private scheduler secret. Publishable API keys alone never authorize checks.
 verify_jwt = false
+
+[functions.telemetry-ingest]
+# Server integration keys are verified by hash inside the function.
+verify_jwt = false
+
+[functions.public-status]
+# Explicitly public read-only endpoint, limited to published page components.
+verify_jwt = false

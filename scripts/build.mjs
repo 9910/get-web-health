@@ -14,6 +14,7 @@ await mkdir('dist', { recursive: true });
 await build({ entryPoints: ['src/app.js'], bundle: true, minify: true, format: 'esm', target: 'es2022', outfile: 'dist/app.js', define: { __SUPABASE_URL__: JSON.stringify(url), __SUPABASE_KEY__: JSON.stringify(key) } });
 await copyFile('src/styles.css', 'dist/styles.css');
 await copyFile('src/icon.svg', 'dist/icon.svg');
+await copyFile('sdk/express.mjs', 'dist/express.mjs');
 await writeFile('dist/index.html', await readFile('src/index.html', 'utf8'));
 await build({ entryPoints: ['supabase/functions/health-worker/index.ts'], bundle: true, format: 'esm', platform: 'neutral', target: 'es2022', external: ['npm:*'], outfile: 'supabase/dashboard-worker.js' });
 console.log('Built Get Web Health into dist/. Only public Supabase credentials are included.');
