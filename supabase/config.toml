@@ -1,0 +1,6 @@
+project_id = "get-web-health"
+
+[functions.health-worker]
+# Requests are authenticated inside the function: a verified user JWT or a
+# private scheduler secret. Publishable API keys alone never authorize checks.
+verify_jwt = false
