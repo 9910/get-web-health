@@ -6,7 +6,7 @@ A standalone web app for email/password accounts and scheduled backend health ch
 
 The database, `health-worker`, private scheduler secret, minute-by-minute Cron, and history cleanup are already installed in project `ywkeuvdhtrmhtsugbntj`. Do not rerun database or scheduler installation for this project. The worker was verified with HTTP 200 and a real scheduler heartbeat. No backend endpoints have been added yet.
 
-The private preview is https://get-web-health.greyhinny.chatgpt.site. It requires ChatGPT access before the app's own Supabase login. For a publicly accessible demo, deploy `dist/` using the hosting instructions below and update Supabase's Site URL and allowed redirect URLs to that public URL.
+The public production site is https://get-web-health.vercel.app. Supabase's Site URL and allowed redirects are configured for this site. The earlier private preview at https://get-web-health.greyhinny.chatgpt.site requires ChatGPT access before the app's own Supabase login.
 
 Custom SMTP is currently disabled in your Supabase project. Configure an SMTP provider for confirmation and recovery emails to public users. Live signup email delivery has not been tested.
 
@@ -16,6 +16,7 @@ Custom SMTP is currently disabled in your Supabase project. Configure an SMTP pr
 - Add, edit, search, pause, resume, and delete backend endpoints.
 - Select 5, 10, 15, 30, or 60-minute intervals; 10 minutes is the default.
 - Real HTTP status, response timing, recent success rate, and check history.
+- Health monitoring with 24-hour and 7-day uptime charts, response-time trends, endpoint filters, and expandable failure diagnostics. Charts use the latest 200 loaded checks; missing periods remain empty, and uptime is the percentage of successful recorded checks rather than continuous availability.
 - Cloud checks continue after the browser closes.
 - Row Level Security and column permissions isolate each user's records and stop users from forging check results.
 - Up to 10 endpoints per account; history is retained for 7 days.

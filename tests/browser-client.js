@@ -2,6 +2,11 @@
 let currentSession = null, listener;
 const user = { id: '11111111-1111-4111-8111-111111111111', email: 'ui-test@example.com' };
 let records = [], history = [];
+if (new URLSearchParams(location.search).has('monitoring')) {
+  const id = '22222222-2222-4222-8222-222222222222';
+  records = [{ id, user_id: user.id, name: 'LOCAL TEST backend', url: 'https://demo.onrender.com/health', enabled: true, interval_minutes: 10, last_status: 'up', last_checked_at: new Date().toISOString() }];
+  history = Array.from({ length: 30 }, (_, i) => ({ id: `fixture-${i}`, monitor_id: id, user_id: user.id, status: i % 7 === 3 ? 'down' : 'up', http_code: i % 7 === 3 ? 503 : 200, response_ms: 80 + i * 25, error: i === 3 ? 'Request timed out' : null, checked_at: new Date(Date.now() - i * 3600000).toISOString() }));
+}
 function query(table) {
   let action = 'select', payload, conditions = [], single = false;
   const q = {
