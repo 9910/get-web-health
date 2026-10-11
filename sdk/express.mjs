@@ -12,7 +12,7 @@ export function createWebHealth({ key=process.env.GWH_TELEMETRY_KEY, endpoint='h
  const middleware=(req,res,next)=>{
   const start=performance.now();res.once('finish',()=>{
    if(stopped||queue.length>=200)return;
-   const route=typeof req.route?.path==='string'?String(req.baseUrl??'')+req.route.path:'unmatched route';
+   const route=typeof req.route?.path==='string'?req.route.path:'unmatched route';
    queue.push({method:['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'].includes(req.method)?req.method:'GET',route:route.split('?')[0].slice(0,200),status_code:res.statusCode,duration_ms:Math.min(600000,Math.max(0,Math.round(performance.now()-start))),error_type:res.locals?.gwhErrorType??(res.statusCode>=500?'ServerError':null)});
    if(queue.length>=batchSize)void flush();
   });next();

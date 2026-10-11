@@ -39,9 +39,9 @@ test('telemetry ownership, secret columns, quotas and transactional status compo
 test('SDK captures route templates without request secrets and drains queued batches',async()=>{
  const payloads=[];const sdk=createWebHealth({key:'gwh_'+'a'.repeat(64),batchSize:2,flushMs:60000,fetchImpl:async(_u,options)=>{payloads.push(JSON.parse(options.body));await new Promise(r=>setTimeout(r,5));return {ok:true};}});
  for(let i=0;i<9;i++){const res=new EventEmitter();res.statusCode=i===0?500:200;res.locals={};let next=false;
- sdk.middleware({method:'GET',baseUrl:'/api',route:{path:'/users/:id'},originalUrl:'/api/users/private-id?token=SECRET',body:{password:'SECRET'},headers:{authorization:'SECRET'}},res,()=>{next=true;});assert.equal(next,true);
+ sdk.middleware({method:'GET',baseUrl:'/private-user-id',route:{path:'/users/:id'},originalUrl:'/api/users/private-id?token=SECRET',body:{password:'SECRET'},headers:{authorization:'SECRET'}},res,()=>{next=true;});assert.equal(next,true);
  if(i===0)sdk.errorMiddleware(new TypeError('SECRET stack'),{},res,()=>{});res.emit('finish');}
- await sdk.close();const rows=payloads.flatMap(p=>p.events);assert.equal(rows.length,9);assert.equal(rows[0].route,'/api/users/:id');assert.equal(rows[0].error_type,'TypeError');assert.equal(JSON.stringify(rows).includes('SECRET'),false);
+ await sdk.close();const rows=payloads.flatMap(p=>p.events);assert.equal(rows.length,9);assert.equal(rows[0].route,'/users/:id');assert.equal(rows[0].error_type,'TypeError');assert.equal(JSON.stringify(rows).includes('SECRET'),false);assert.equal(JSON.stringify(rows).includes('private-user-id'),false);
 });
 test('SDK delivery failures do not propagate and summary measures server errors',async()=>{
  const sdk=createWebHealth({key:'gwh_'+'b'.repeat(64),fetchImpl:async()=>{throw new Error('offline')}});const res=new EventEmitter();res.statusCode=200;res.locals={};sdk.middleware({method:'GET'},res,()=>{});res.emit('finish');await sdk.close();
