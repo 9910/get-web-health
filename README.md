@@ -18,6 +18,8 @@ Custom SMTP is currently disabled in your Supabase project. Configure an SMTP pr
 - Real HTTP status, response timing, recent success rate, and check history.
 - Health monitoring with 24-hour and 7-day uptime charts, response-time trends, endpoint filters, and expandable failure diagnostics. Charts use the latest 200 loaded checks; missing periods remain empty, and uptime is the percentage of successful recorded checks rather than continuous availability.
 - Cloud checks continue after the browser closes.
+- Incident timelines group failed checks and show observed recovery or gaps. Reliability reports include P95 timing, configurable sample success targets, and CSV downloads for the selected view.
+- Plans & usage shows the active Free plan and proposed Pro/Business tiers. Paid checkout and billing are not enabled; preview prices do not create subscriptions or grant higher limits.
 - Row Level Security and column permissions isolate each user's records and stop users from forging check results.
 - Up to 10 endpoints per account; history is retained for 7 days.
 
